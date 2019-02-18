@@ -1,0 +1,6 @@
+[run]
+branch = True
+source = masakari-monitors-icmp-plugin
+
+[report]
+ignore_errors = True
