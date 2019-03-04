@@ -13,6 +13,16 @@
 # limitations under the License.
 from oslo_config import cfg
 
+HOST_ICMP_GROUP = 'host_icmp'
+
+host_icmp_group = cfg.OptGroup(
+    HOST_ICMP_GROUP,
+    title="HOST ICMP Plugin Options",
+    help="""
+Configuration options for HOST ICMP Plugin.
+"""
+)
+
 monitor_host_opts = [
     cfg.StrOpt('ssh_user',
                default='root',
@@ -44,9 +54,8 @@ monitor_host_opts = [
                 default=[],
                 help="""Monitor networks
 e.g:
-  * external.local
-  * internal.local
   * storge.local
+  * storge_mgmt.local
 """),
     cfg.IntOpt('icmp_max_retry',
                default=3,
@@ -80,6 +89,4 @@ def register_opts(conf):
 
 
 def list_opts():
-    return {
-        'host_icmp': monitor_host_opts
-    }
+    return [(HOST_ICMP_GROUP, monitor_host_opts)]
