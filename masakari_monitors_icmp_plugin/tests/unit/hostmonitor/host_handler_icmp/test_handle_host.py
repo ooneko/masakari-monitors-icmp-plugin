@@ -22,7 +22,6 @@ from pssh import exceptions as ssh_exception
 import testtools
 
 from masakarimonitors.objects import event_constants as ec
-from openstack.exceptions import HttpException
 from oslo_concurrency.processutils import ProcessExecutionError
 
 import masakari_monitors_icmp_plugin.conf
@@ -124,135 +123,128 @@ class TestHandleHost(testtools.TestCase):
         host_handler.stop()
         assert host_handler.running is False
 
+    @mock.patch.object(HandleHost, '_is_running')
     @mock.patch.object(HandleHost, '_load_hosts')
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
                 '.host_handler_icmp.handle_host.eventlet')
     def test_watch_masakari_api_segment_added(self,
                                               mock_eventlet,
-                                              mock_loadhosts):
+                                              mock_loadhosts,
+                                              mock_running):
         host_handler = HandleHost()
         host_handler.running = True
         host_handler.hosts = None
         mock_loadhosts.return_value = None
+        mock_running.side_effect = [True, False]
         tp = mock.Mock()
         mock_api = mock.Mock()
-        mock_api.get_segments.side_effect = [fake_segments[:], Exception]
+        mock_api.get_segments.return_value = fake_segments[:]
         host_handler.api = mock_api
         host_handler.segments = fake_segments[:1]
 
-        self.assertRaises(Exception, host_handler._watch_masakari_api, tp)
+        host_handler._watch_masakari_api(tp)
         mock_loadhosts.assert_called_once_with(fake_segments[:])
         mock_api.get_segments.assert_called()
 
+    @mock.patch.object(HandleHost, '_is_running')
     @mock.patch.object(HandleHost, '_load_hosts')
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
                 '.host_handler_icmp.handle_host.eventlet')
     def test_watch_masakari_api_segment_removed(self,
                                                 mock_eventlet,
-                                                mock_loadhosts):
+                                                mock_loadhosts,
+                                                mock_running):
         host_handler = HandleHost()
         host_handler.running = True
         host_handler.hosts = None
         mock_loadhosts.return_value = None
+        mock_running.side_effect = [True, False]
         tp = mock.Mock()
         mock_api = mock.Mock()
-        mock_api.get_segments.side_effect = [fake_segments[:1], Exception]
+        mock_api.get_segments.return_value = fake_segments[:1]
         host_handler.api = mock_api
         host_handler.segments = fake_segments[:]
 
-        self.assertRaises(Exception, host_handler._watch_masakari_api, tp)
+        host_handler._watch_masakari_api(tp)
         mock_loadhosts.assert_called_once_with(fake_segments[:1])
         mock_api.get_segments.assert_called()
 
+    @mock.patch.object(HandleHost, '_is_running')
     @mock.patch.object(HandleHost, '_load_hosts')
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
                 '.host_handler_icmp.handle_host.eventlet')
     def test_watch_masakari_api_hosts_added(self,
                                             mock_eventlet,
-                                            mock_loadhosts):
+                                            mock_loadhosts,
+                                            mock_running):
         host_handler = HandleHost()
         host_handler.running = True
         host_handler.hosts = []
         mock_loadhosts.return_value = fake_hosts[:]
+        mock_running.side_effect = [True, False]
         tp = mock.Mock()
         mock_api = mock.Mock()
-        mock_api.get_segments.side_effect = [fake_segments[:], Exception]
+        mock_api.get_segments.return_value = fake_segments[:]
         host_handler.api = mock_api
         host_handler.segments = fake_segments[:]
         calls = [mock.call(host_handler._check_host, fake_hosts[0]),
                  mock.call(host_handler._check_host, fake_hosts[1]),
                  mock.call(host_handler._check_host, fake_hosts[2])]
 
-        self.assertRaises(Exception, host_handler._watch_masakari_api, tp)
+        host_handler._watch_masakari_api(tp)
         mock_loadhosts.assert_called_once_with(fake_segments[:])
         self.assertEqual(host_handler.hosts, fake_hosts)
         tp.spawn.assert_has_calls(calls)
         mock_api.get_segments.assert_called()
 
+    @mock.patch.object(HandleHost, '_is_running')
     @mock.patch.object(HandleHost, '_load_hosts')
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
                 '.host_handler_icmp.handle_host.eventlet')
     def test_watch_masakari_api_hosts_removed(self,
                                               mock_eventlet,
-                                              mock_loadhosts):
+                                              mock_loadhosts,
+                                              mock_running):
         host_handler = HandleHost()
         host_handler.running = True
+        mock_running.side_effect = [True, False]
         host_handler.hosts = fake_hosts[:]
         mock_loadhosts.return_value = fake_hosts[1:]
         tp = mock.Mock()
         mock_api = mock.Mock()
-        mock_api.get_segments.side_effect = [fake_segments[:], Exception]
+        mock_api.get_segments.return_value = fake_segments[:]
         host_handler.api = mock_api
         host_handler.segments = fake_segments[:]
 
-        self.assertRaises(Exception, host_handler._watch_masakari_api, tp)
+        host_handler._watch_masakari_api(tp)
         mock_loadhosts.assert_called_once_with(fake_segments[:])
         self.assertEqual(host_handler.hosts, fake_hosts[1:])
         mock_api.get_segments.assert_called()
 
+    @mock.patch.object(HandleHost, '_is_running')
     @mock.patch.object(HandleHost, '_load_hosts')
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
                 '.host_handler_icmp.handle_host.eventlet')
     def test_watch_masakari_api_no_change(self,
                                           mock_eventlet,
-                                          mock_loadhosts):
+                                          mock_loadhosts,
+                                          mock_running):
         host_handler = HandleHost()
         host_handler.running = True
+        mock_running.side_effect = [True, False]
         host_handler.hosts = fake_hosts[:]
         mock_loadhosts.return_value = fake_hosts[:]
         tp = mock.Mock()
         mock_api = mock.Mock()
-        mock_api.get_segments.side_effect = [fake_segments[:], Exception]
+        mock_api.get_segments.return_value = fake_segments[:]
         host_handler.api = mock_api
         host_handler.segments = fake_segments[:]
 
-        self.assertRaises(Exception, host_handler._watch_masakari_api, tp)
+        host_handler._watch_masakari_api(tp)
         mock_loadhosts.assert_called_once_with(fake_segments[:])
         self.assertEqual(host_handler.hosts, fake_hosts[:])
         mock_api.get_segments.assert_called()
         tp.spawn.assert_not_called()
-
-    @mock.patch.object(HandleHost, '_load_hosts')
-    @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
-                '.host_handler_icmp.handle_host.eventlet')
-    def test_watch_masakari_api_with_http_exception(self,
-                                                    mock_eventlet,
-                                                    mock_loadhosts):
-        host_handler = HandleHost()
-        host_handler.running = True
-        host_handler.hosts = fake_hosts[:]
-        mock_loadhosts.side_effect = [HttpException, ]
-        tp = mock.Mock()
-        mock_api = mock.Mock()
-        mock_api.get_segments.side_effect = [HttpException, Exception]
-        host_handler.api = mock_api
-        host_handler.segments = fake_segments[:]
-
-        self.assertRaises(Exception, host_handler._watch_masakari_api, tp)
-        mock_api.get_segments.assert_called()
-        mock_loadhosts.assert_called_once_with(fake_segments[:])
-        self.assertEqual(host_handler.hosts, fake_hosts[:])
-        self.assertEqual(host_handler.segments, fake_segments[:])
 
     @mock.patch.object(eventlet, 'GreenPool')
     def test_monitor_hosts(self, mock_greenpool):
@@ -379,16 +371,20 @@ class TestHandleHost(testtools.TestCase):
         mock_eventlet.greenthread.sleep.assert_called_with(
             CONF.host.monitoring_interval)
 
+    @mock.patch.object(HandleHost, '_load_hosts')
     @mock.patch.object(HandleHost, '_fence_host')
     @mock.patch.object(HandleHost, '_make_event')
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
                 '.host_handler_icmp.handle_host.CONF')
     def test_send_notification_when_host_alived(self, mock_conf,
                                                 mock_make_event,
-                                                mock_fence_host):
+                                                mock_fence_host,
+                                                mock_load_hosts):
         host_handler = HandleHost()
         host_handler.notifier = mock.Mock()
-        host = FakeHost(name="fake_host")
+        host_handler.segments = fake_segments
+        mock_load_hosts.return_value = []
+        host = fake_hosts[0]
         alived = True
 
         host_handler._send_notification(host, alived)
@@ -396,6 +392,7 @@ class TestHandleHost(testtools.TestCase):
         mock_make_event.assert_called_once_with(host, alived)
         host_handler.notifier.send_notification.assert_called_once()
 
+    @mock.patch.object(HandleHost, '_load_hosts')
     @mock.patch.object(HandleHost, '_fence_host')
     @mock.patch.object(HandleHost, '_make_event')
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
@@ -403,11 +400,14 @@ class TestHandleHost(testtools.TestCase):
     def test_send_notification_when_host_down(self,
                                               mock_conf,
                                               mock_make_event,
-                                              mock_fence_host):
+                                              mock_fence_host,
+                                              mock_load_hosts):
 
         host_handler = HandleHost()
         host_handler.notifier = mock.Mock()
-        host = FakeHost(name="fake_host")
+        host_handler.segments = fake_segments
+        mock_load_hosts.return_value = []
+        host = fake_hosts[0]
         alived = False
         is_power_off = True
         mock_fence_host.return_value = is_power_off
@@ -417,6 +417,32 @@ class TestHandleHost(testtools.TestCase):
         mock_fence_host.assert_called_once_with(host)
         mock_make_event.assert_called_once_with(host, alived, is_power_off)
         host_handler.notifier.send_notification.assert_called_once()
+
+    @mock.patch.object(HandleHost, '_load_hosts')
+    @mock.patch.object(HandleHost, '_fence_host')
+    @mock.patch.object(HandleHost, '_make_event')
+    @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
+                '.host_handler_icmp.handle_host.CONF')
+    def test_send_notification_when_host_in_maintenance(self,
+                                                        mock_conf,
+                                                        mock_make_event,
+                                                        mock_fence_host,
+                                                        mock_load_hosts):
+
+        host_handler = HandleHost()
+        host_handler.notifier = mock.Mock()
+        host_handler.segments = fake_segments
+        mock_load_hosts.return_value = fake_hosts[:1]
+        host = fake_hosts[0]
+        alived = False
+        is_power_off = True
+        mock_fence_host.return_value = is_power_off
+
+        host_handler._send_notification(host, alived)
+
+        mock_fence_host.assert_not_called()
+        mock_make_event.assert_not_called()
+        host_handler.notifier.send_notification.assert_not_called()
 
     @mock.patch('masakari_monitors_icmp_plugin.hostmonitor'
                 '.host_handler_icmp.handle_host.timeutils')

@@ -95,3 +95,17 @@ class TestApi(testtools.TestCase):
         ret = api.get_hosts(mock.Mock())
         self.assertEqual(expected_hosts, ret)
         client.hosts.assert_called_once()
+
+    @mock.patch.object(Api, '_make_client')
+    def test_get_hosts_only_maintenance_node(self, mock_client):
+        api = Api()
+        client = mock.Mock()
+        mock_client.return_value = client
+        hosts = fake_hosts[:]
+        client.hosts.return_value = hosts
+        hosts[0].on_maintenance = True
+        expected_hosts = hosts[:1]
+
+        ret = api.get_hosts(mock.Mock(), maintenance=True)
+        self.assertEqual(expected_hosts, ret)
+        client.hosts.assert_called_once()

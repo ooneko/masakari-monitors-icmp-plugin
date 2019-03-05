@@ -40,3 +40,14 @@ def retry(func=None, max_retry=0, retry_interval=0):
                 remain -= 1
                 eventlet.greenthread.sleep(retry_interval)
     return wrap
+
+
+def safe_run(func):
+    @wraps(func)
+    def wrap(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            LOG.warn("Exception occurred: %s" % e)
+
+    return wrap

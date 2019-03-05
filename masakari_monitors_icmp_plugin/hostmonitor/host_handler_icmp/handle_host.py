@@ -15,7 +15,6 @@
 import random
 
 import eventlet
-from openstack.exceptions import HttpException
 from oslo_concurrency.processutils import ProcessExecutionError
 from oslo_log import log as oslo_logging
 from oslo_utils import timeutils
@@ -27,7 +26,7 @@ from .ipmitool import IpmiTool
 import masakari_monitors_icmp_plugin.conf
 from masakari_monitors_icmp_plugin.exceptions import HostUnavailableException
 from masakari_monitors_icmp_plugin.ha import api
-from masakari_monitors_icmp_plugin.utils import retry
+from masakari_monitors_icmp_plugin.utils import retry, safe_run
 
 from masakarimonitors.ha import masakari
 import masakarimonitors.hostmonitor.host_handler.driver as driver
@@ -72,44 +71,39 @@ class HandleHost(driver.DriverBase):
     def stop(self):
         self.running = False
 
+    def _is_running(self):
+        return self.running
+
+    @safe_run
     def _watch_masakari_api(self, tp):
         """Watch hosts and segments in masakari-api
 
         When host removed from segment, remove host from self.hosts
         When host added to segment by masakri-api, start monitor the host.
         """
-        while self.running:
-            # Avoid to communication with api broken
-            try:
-                segments = self.api.get_segments()
-            except HttpException as e:
-                LOG.warn('Getting segment occur error', e)
-            else:
-                if segments != self.segments:
-                    # Add new segment to self.segments if new segment added
-                    # by masakari-api
-                    [self.segments.append(segment)
-                     for segment in segments if segment not in self.segments]
-                # remove segment which already removed by masakari-api
-                    [self.segments.remove(segment)
-                     for segment in self.segments if segment not in segments]
+        while self._is_running():
+            segments = self.api.get_segments()
+            if segments != self.segments:
+                # Add new segment to self.segments if new segment added
+                # by masakari-api
+                [self.segments.append(segment)
+                 for segment in segments if segment not in self.segments]
+            # remove segment which already removed by masakari-api
+                [self.segments.remove(segment)
+                 for segment in self.segments if segment not in segments]
 
-            try:
-                hosts = self._load_hosts(self.segments)
-            except HttpException as e:
-                LOG.warn('Getting hosts occur error', e)
-            else:
-                if hosts != self.hosts:
-                    # Add host to be monitor
-                    new_hosts = [host for host in hosts
-                                 if host not in self.hosts]
-                    self.hosts.extend(new_hosts)
-                    [tp.spawn(self._check_host, host) for host in new_hosts]
+            hosts = self._load_hosts(self.segments)
+            if hosts != self.hosts:
+                # Add host to be monitor
+                new_hosts = [host for host in hosts
+                             if host not in self.hosts]
+                self.hosts.extend(new_hosts)
+                [tp.spawn(self._check_host, host) for host in new_hosts]
 
-                    # Remove host which already removed by masakari-api from
-                    # segment
-                    [self.hosts.remove(host)
-                     for host in self.hosts if host not in hosts]
+                # Remove host which already removed by masakari-api from
+                # segment
+                [self.hosts.remove(host)
+                 for host in self.hosts if host not in hosts]
 
             eventlet.greenthread.sleep(CONF.host_icmp.refresh_info_interval)
 
@@ -125,12 +119,12 @@ class HandleHost(driver.DriverBase):
         tp.spawn(self._watch_masakari_api, tp)
         tp.waitall()
 
-    def _load_hosts(self, segments):
+    def _load_hosts(self, segments, maintenance=False):
         """Load hosts from segments."""
 
         hosts = []
         for segment in segments:
-            hosts.extend(self.api.get_hosts(segment))
+            hosts.extend(self.api.get_hosts(segment, maintenance=maintenance))
         if not hosts:
             LOG.warn("No hosts to monitor")
 
@@ -151,7 +145,7 @@ class HandleHost(driver.DriverBase):
     def _check_host(self, host):
         """Check host whether alive or not."""
 
-        while self.running and host in self.hosts:
+        while self._is_running() and host in self.hosts:
             try:
                 if not self.networks:
                     self._ping_host(host)
@@ -172,11 +166,16 @@ class HandleHost(driver.DriverBase):
 
             eventlet.greenthread.sleep(CONF.host.monitoring_interval)
 
+    @safe_run
     def _send_notification(self, host, alived):
         """Send notification to masakari api
 
         Tell api "host down" or "host up"
         """
+        # Ensure host not in maintenance mode
+        if host in self._load_hosts(self.segments, maintenance=True):
+            return
+
         if alived:
             event = self._make_event(host, alived)
         else:

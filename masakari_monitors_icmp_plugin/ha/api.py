@@ -52,11 +52,16 @@ class Api(object):
 
     @retry(max_retry=CONF.host.api_retry_max,
            retry_interval=CONF.host.api_retry_interval)
-    def get_hosts(self, segment):
+    def get_hosts(self, segment, maintenance=False):
         """Get all hosts from single segment."""
 
         LOG.info("Get all hosts from segment: %s", segment.name)
         client = self._make_client()
         # Maintenance host have no need of monitor
-        return [host for host in client.hosts(segment.uuid)
-                if not host.on_maintenance]
+        # But maintenance node used by fence
+        if not maintenance:
+            return [host for host in client.hosts(segment.uuid)
+                    if not host.on_maintenance]
+        else:
+            return [host for host in client.hosts(segment.uuid)
+                    if host.on_maintenance]
