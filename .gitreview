@@ -1,4 +1,4 @@
 [gerrit]
 host=review.ustack.com
 port=29418
-project=openstack/masakari-hostmonitor-icmp-plugin.git
+project=openstack/masakari-monitors-icmp-plugin.git
