@@ -10,8 +10,8 @@ monitor openstack cluster is not. openstack cluster usually have multiple networ
 and two more network have to monitor.
 
 masakari-monitors-icmp-plugin could provides an ablity that monitor multiple network,
-even "TWO LEVEL" check - SSH to another host check target host is realy failed or not.
-(may be just masakari-monitor to that host network unstable).
+even "TWO LEVEL CHECK" - SSH to another host check target host is realy failed or not.
+(Why need "TWO LEVEL CHECK": may be just network unstable from masakari-monitor to that host).
 
 
 * Free software: Apache license
